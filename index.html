@@ -1,0 +1,2340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FocusFrame – Boniface Rono</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   Dark navy base, gold accents, emerald for wins, rose for misses
+   Font: system stack leaning on -apple-system for crisp mobile render
+   ============================================================ */
+:root {
+  --bg:       #020617;
+  --surface:  #0f172a;
+  --card:     #1e293b;
+  --card2:    #253347;
+  --border:   #334155;
+  --gold:     #f59e0b;
+  --gold-dim: #78450a;
+  --green:    #10b981;
+  --red:      #ef4444;
+  --blue:     #3b82f6;
+  --purple:   #8b5cf6;
+  --text:     #f1f5f9;
+  --muted:    #94a3b8;
+  --dim:      #475569;
+  --radius:   12px;
+  --radius-sm:8px;
+  --gold-glow: 0 0 18px rgba(245,158,11,0.25);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-bottom: 80px; /* nav clearance */
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+#app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-left { display: flex; flex-direction: column; }
+.app-name { font-size: 18px; font-weight: 800; color: var(--gold); letter-spacing: 0.5px; }
+.header-quote { font-size: 10px; color: var(--muted); font-style: italic; max-width: 220px; }
+.header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#live-clock { font-size: 20px; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+#live-date { font-size: 10px; color: var(--muted); }
+
+/* ============================================================
+   SCORE BANNER (top of NOW tab)
+   ============================================================ */
+.score-banner {
+  background: linear-gradient(135deg, #1a0a00, var(--card));
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 12px 12px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.score-num { font-size: 40px; font-weight: 900; color: var(--gold); line-height: 1; }
+.score-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.score-right { text-align: right; }
+.streak-badge {
+  display: inline-block;
+  background: var(--gold);
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-top: 4px;
+}
+
+/* ============================================================
+   CURRENT TASK CARD
+   ============================================================ */
+.current-task-card {
+  margin: 10px 12px 0;
+  background: var(--card);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--gold);
+  padding: 12px 14px;
+}
+.task-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--gold); margin-bottom: 4px; }
+.task-name { font-size: 17px; font-weight: 700; }
+.task-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.task-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ============================================================
+   SECTION CARDS
+   ============================================================ */
+.section { margin: 10px 12px 0; }
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.section-title .icon { font-size: 14px; }
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+
+/* ============================================================
+   MOOD ROW
+   ============================================================ */
+.mood-row { display: flex; justify-content: space-around; margin-bottom: 12px; }
+.mood-btn {
+  font-size: 28px;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.mood-btn.selected { border-color: var(--gold); transform: scale(1.15); }
+.mood-btn:active { transform: scale(0.95); }
+
+/* ============================================================
+   SLIDER
+   ============================================================ */
+.slider-row { margin: 8px 0; }
+.slider-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.slider-val { color: var(--gold); font-weight: 700; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+
+/* ============================================================
+   TOGGLE SWITCHES
+   ============================================================ */
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-label { font-size: 14px; }
+.toggle-sub { font-size: 11px; color: var(--muted); }
+.toggle-switch {
+  position: relative;
+  width: 50px; height: 28px;
+  flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0;
+  background: var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.25s;
+}
+.toggle-track::before {
+  content: '';
+  position: absolute;
+  left: 3px; top: 3px;
+  width: 22px; height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.25s;
+}
+input:checked + .toggle-track { background: var(--green); }
+input:checked + .toggle-track::before { transform: translateX(22px); }
+
+/* ============================================================
+   COUNTER INPUTS
+   ============================================================ */
+.counter-group { display: flex; gap: 12px; margin-top: 8px; }
+.counter-item { flex: 1; }
+.counter-item label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+.counter-wrap { display: flex; align-items: center; gap: 6px; }
+.counter-btn {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.counter-btn:active { background: var(--gold-dim); }
+.counter-val {
+  flex: 1;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gold);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+}
+
+/* ============================================================
+   TEXT INPUTS & TEXTAREAS
+   ============================================================ */
+input[type="text"], input[type="number"], textarea, input[type="time"] {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+input[type="text"]:focus, input[type="number"]:focus,
+textarea:focus, input[type="time"]:focus {
+  border-color: var(--gold);
+}
+textarea { resize: vertical; min-height: 72px; }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 18px;
+  transition: opacity 0.15s, transform 0.1s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-gold { background: var(--gold); color: #000; }
+.btn-gold:hover { opacity: 0.9; }
+.btn-green { background: var(--green); color: #000; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-full { width: 100%; }
+.btn-sm { min-height: 36px; font-size: 13px; padding: 6px 14px; }
+
+/* ============================================================
+   SOBRIETY COUNTERS
+   ============================================================ */
+.sober-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.sober-item {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.sober-days { font-size: 32px; font-weight: 900; color: var(--green); line-height: 1; }
+.sober-label { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+.sober-target { font-size: 10px; color: var(--dim); margin-top: 4px; }
+.sober-prog {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.sober-prog-bar { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.5s; }
+
+/* ============================================================
+   READING TRACKER
+   ============================================================ */
+.reading-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.reading-box {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.reading-box-title { font-size: 11px; color: var(--gold); font-weight: 700; margin-bottom: 8px; }
+
+/* ============================================================
+   CPA COUNTDOWN
+   ============================================================ */
+.cpa-box {
+  background: linear-gradient(135deg, #0c0a1a, #1a1040);
+  border: 1px solid var(--purple);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+}
+.cpa-days { font-size: 36px; font-weight: 900; color: var(--purple); }
+.cpa-label { font-size: 11px; color: var(--muted); }
+.cpa-chapters { font-size: 13px; color: var(--text); margin-top: 6px; }
+
+/* ============================================================
+   PROGRESS BARS
+   ============================================================ */
+.prog-row { margin: 8px 0; }
+.prog-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.prog-name { color: var(--muted); }
+.prog-pct { color: var(--gold); font-weight: 700; }
+.prog-bar-bg { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.prog-bar { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+.prog-gold { background: var(--gold); }
+.prog-green { background: var(--green); }
+.prog-blue { background: var(--blue); }
+.prog-purple { background: var(--purple); }
+
+/* ============================================================
+   BOTTOM NAV
+   ============================================================ */
+#bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+}
+.nav-btn {
+  flex: 1;
+  padding: 10px 4px 14px;
+  background: none;
+  border: none;
+  color: var(--dim);
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  transition: color 0.2s;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.nav-btn .nav-icon { font-size: 22px; }
+.nav-btn.active { color: var(--gold); }
+
+/* ============================================================
+   TABS / SCREENS
+   ============================================================ */
+.screen { display: none; animation: fadeIn 0.2s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ============================================================
+   GRATITUDE
+   ============================================================ */
+.gratitude-item { margin-bottom: 8px; }
+.gratitude-item label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: block; }
+
+/* ============================================================
+   SCHEDULE / TIMELINE
+   ============================================================ */
+.timeline { padding: 4px 0; }
+.tl-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: var(--radius-sm);
+  padding-left: 8px;
+}
+.tl-item:last-child { border-bottom: none; }
+.tl-item.current { background: rgba(245,158,11,0.07); }
+.tl-time { font-size: 11px; color: var(--gold); font-weight: 700; min-width: 52px; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.tl-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.tl-dot.done { background: var(--green); }
+.tl-dot.current-dot { background: var(--gold); box-shadow: 0 0 0 3px rgba(245,158,11,0.3); }
+.tl-name { font-size: 14px; font-weight: 600; }
+.tl-sub { font-size: 11px; color: var(--muted); }
+
+/* ============================================================
+   STATS / SCORECARD
+   ============================================================ */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat-box {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.stat-val { font-size: 28px; font-weight: 900; color: var(--gold); }
+.stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* ============================================================
+   FINANCE INPUTS
+   ============================================================ */
+.fin-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.fin-item label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: block; }
+
+/* ============================================================
+   MODAL / OVERLAY
+   ============================================================ */
+.overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.15s;
+}
+.overlay.hidden { display: none; }
+.modal {
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 500px;
+  padding: 24px 20px 40px;
+  border-top: 1px solid var(--border);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-title { font-size: 20px; font-weight: 800; color: var(--gold); margin-bottom: 8px; }
+.modal-body { color: var(--muted); line-height: 1.6; font-size: 14px; margin-bottom: 20px; }
+.modal-close { position: absolute; top: 16px; right: 20px; font-size: 24px; background: none; border: none; color: var(--muted); cursor: pointer; }
+
+/* ============================================================
+   AFFIRMATION BOX
+   ============================================================ */
+.affirmation-box {
+  background: linear-gradient(135deg, var(--card), #1a0e00);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius);
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--gold);
+  text-align: center;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.affirmation-hint { font-size: 10px; color: var(--dim); margin-top: 6px; }
+
+/* ============================================================
+   TIMER
+   ============================================================ */
+.timer-display {
+  font-size: 48px;
+  font-weight: 900;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  letter-spacing: 2px;
+  margin: 10px 0;
+}
+.timer-controls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+
+/* ============================================================
+   STREAK CELEBRATION
+   ============================================================ */
+.celebration {
+  text-align: center;
+  padding: 20px;
+  animation: pulse 0.5s ease-in-out;
+}
+.celebration-icon { font-size: 56px; margin-bottom: 8px; }
+.celebration-text { font-size: 22px; font-weight: 800; color: var(--gold); }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+
+/* ============================================================
+   WEEKLY HEATMAP
+   ============================================================ */
+.heatmap { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+.heat-day {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+  color: var(--dim);
+}
+.heat-0 { background: var(--border); }
+.heat-1 { background: rgba(245,158,11,0.2); }
+.heat-2 { background: rgba(245,158,11,0.45); }
+.heat-3 { background: var(--gold); color: #000; }
+
+/* ============================================================
+   CHIP / TAG
+   ============================================================ */
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.chip.green { background: rgba(16,185,129,0.15); border-color: var(--green); color: var(--green); }
+.chip.red { background: rgba(239,68,68,0.15); border-color: var(--red); color: var(--red); }
+.chip.gold { background: rgba(245,158,11,0.15); border-color: var(--gold); color: var(--gold); }
+
+/* ============================================================
+   FAMILY CARD
+   ============================================================ */
+.family-row { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
+.family-hours { display: flex; align-items: center; gap: 10px; }
+.family-hours input[type="number"] { width: 80px; }
+
+/* ============================================================
+   SUBMIT ROW
+   ============================================================ */
+.submit-row { margin: 16px 12px; }
+
+/* ============================================================
+   HISTORY LIST
+   ============================================================ */
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+.history-date { font-size: 13px; font-weight: 600; }
+.history-score { font-size: 18px; font-weight: 900; color: var(--gold); }
+
+/* ============================================================
+   FINANCIAL FREEDOM METER
+   ============================================================ */
+.freedom-meter {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.freedom-pct { font-size: 48px; font-weight: 900; color: var(--gold); }
+.freedom-label { font-size: 12px; color: var(--muted); }
+.freedom-bar-bg {
+  height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px 0 6px;
+}
+.freedom-bar { height: 100%; background: linear-gradient(90deg, var(--green), var(--gold)); border-radius: 8px; transition: width 0.8s; }
+
+/* ============================================================
+   BREATHING EXERCISE
+   ============================================================ */
+.breath-circle {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245,158,11,0.4), transparent);
+  border: 2px solid var(--gold);
+  margin: 20px auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; color: var(--gold);
+  transition: transform 4s ease-in-out;
+}
+.breath-circle.expand { transform: scale(1.5); }
+.breath-circle.normal { transform: scale(1); }
+
+/* ============================================================
+   MISC
+   ============================================================ */
+.divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+.spacer { height: 12px; }
+.text-muted { color: var(--muted); }
+.text-gold { color: var(--gold); }
+.text-green { color: var(--green); }
+.text-red { color: var(--red); }
+.fw-700 { font-weight: 700; }
+.mt-8 { margin-top: 8px; }
+.fs-12 { font-size: 12px; }
+.center { text-align: center; }
+.tab-header { padding: 12px 16px 4px; font-size: 20px; font-weight: 800; }
+.sub-header { padding: 2px 16px 12px; font-size: 12px; color: var(--muted); }
+.notes-toggle { font-size: 12px; color: var(--gold); cursor: pointer; margin-top: 6px; display: inline-block; }
+
+/* business notes area */
+.notes-area { margin-top: 8px; display: none; }
+.notes-area.open { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header id="app-header">
+  <div class="header-left">
+    <span class="app-name">⚡ FocusFrame</span>
+    <span class="header-quote" id="rotating-quote">Loading...</span>
+  </div>
+  <div class="header-right">
+    <span id="live-clock">00:00</span>
+    <span id="live-date"></span>
+  </div>
+</header>
+
+<!-- ============================================================
+     SCREEN 1: NOW
+     ============================================================ -->
+<div id="screen-now" class="screen active">
+
+  <!-- Score Banner -->
+  <div class="score-banner">
+    <div>
+      <div class="score-label">Better Man Score</div>
+      <div class="score-num" id="today-score">0</div>
+      <div class="score-label">/ 100 pts</div>
+    </div>
+    <div class="score-right">
+      <div class="score-label">Day streak</div>
+      <div style="font-size:28px;font-weight:900;color:var(--green)" id="main-streak">0</div>
+      <div id="streak-badge-main"></div>
+    </div>
+  </div>
+
+  <!-- Current Task -->
+  <div class="current-task-card">
+    <div class="task-label">⏰ Current / Next Task</div>
+    <div class="task-name" id="current-task-name">Loading...</div>
+    <div class="task-time" id="current-task-time"></div>
+    <div class="task-actions">
+      <button class="btn btn-gold btn-sm" onclick="openTimerModal()">▶ Start Timer</button>
+      <button class="btn btn-outline btn-sm" onclick="showWhySkip()">Skip?</button>
+      <button class="btn btn-outline btn-sm" onclick="openHelpModal()">🆘 Help</button>
+    </div>
+  </div>
+
+  <!-- 1. MENTAL HEALTH -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🧠</span> Mental Health</div>
+    <div class="card">
+      <!-- Mood -->
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">How are you feeling right now?</div>
+      <div class="mood-row">
+        <button class="mood-btn" id="mood-happy" onclick="selectMood('happy')" title="Happy">😊</button>
+        <button class="mood-btn" id="mood-neutral" onclick="selectMood('neutral')" title="Neutral">😐</button>
+        <button class="mood-btn" id="mood-sad" onclick="selectMood('sad')" title="Struggling">😔</button>
+        <button class="mood-btn" id="mood-angry" onclick="selectMood('angry')" title="Frustrated">😤</button>
+        <button class="mood-btn" id="mood-anxious" onclick="selectMood('anxious')" title="Anxious">😰</button>
+      </div>
+      <!-- Stress -->
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Stress Level</span>
+          <span class="slider-val" id="stress-val">5</span>
+        </div>
+        <input type="range" min="0" max="10" value="5" id="stress-slider"
+          oninput="document.getElementById('stress-val').textContent=this.value; saveToday()">
+      </div>
+      <!-- Daily Affirmation -->
+      <div class="affirmation-box" id="affirmation-box" onclick="nextAffirmation()">
+        "I am becoming the man my family needs."
+        <div class="affirmation-hint">Tap to cycle ↺</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. PHYSICAL HEALTH (quick view) -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💪</span> Physical Health</div>
+    <div class="card">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">5AM Wake-up</div>
+          <div class="toggle-sub" id="wake-display">Target: 05:00</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-wake" onchange="saveToday();recalcScore()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Morning Workout</div>
+          <div class="toggle-sub">Pushups + situps + stretches</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-workout" onchange="saveToday();recalcScore()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="counter-group">
+        <div class="counter-item">
+          <label>Pushups</label>
+          <div class="counter-wrap">
+            <button class="counter-btn" onclick="changeCount('pushups',-1)">−</button>
+            <div class="counter-val" id="pushups-val">0</div>
+            <button class="counter-btn" onclick="changeCount('pushups',1)">+</button>
+          </div>
+        </div>
+        <div class="counter-item">
+          <label>Situps</label>
+          <div class="counter-wrap">
+            <button class="counter-btn" onclick="changeCount('situps',-1)">−</button>
+            <div class="counter-val" id="situps-val">0</div>
+            <button class="counter-btn" onclick="changeCount('situps',1)">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="toggle-row" style="margin-top:8px">
+        <div class="toggle-label">Cold Shower ❄️</div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-shower" onchange="saveToday();recalcScore()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-label">Healthy Breakfast 🥗</div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-breakfast" onchange="saveToday();recalcScore()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. SOBRIETY -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🛡️</span> Sobriety</div>
+    <div class="card">
+      <div class="sober-grid">
+        <div class="sober-item">
+          <div class="sober-days" id="alcohol-days">0</div>
+          <div class="sober-label">Days Sober</div>
+          <div class="sober-target">Target: 365 days</div>
+          <div class="sober-prog"><div class="sober-prog-bar" id="alcohol-bar" style="width:0%"></div></div>
+        </div>
+        <div class="sober-item">
+          <div class="sober-days" id="weed-days">0</div>
+          <div class="sober-label">Days Clean</div>
+          <div class="sober-target">Target: 365 days</div>
+          <div class="sober-prog"><div class="sober-prog-bar" id="weed-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">No Alcohol Today ✅</div>
+          <div class="toggle-sub">Keep the streak alive</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-alcohol" onchange="saveToday();recalcScore();updateSobriety()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">No Weed Today ✅</div>
+          <div class="toggle-sub">Clear mind, sharp focus</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-weed" onchange="saveToday();recalcScore();updateSobriety()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="slider-row" style="margin-top:10px">
+        <div class="slider-label">
+          <span>Craving Intensity</span>
+          <span class="slider-val" id="craving-val">0</span>
+        </div>
+        <input type="range" min="0" max="10" value="0" id="craving-slider"
+          oninput="document.getElementById('craving-val').textContent=this.value; saveToday()">
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. READING -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📚</span> Reading</div>
+    <div class="card">
+      <!-- CPA-K countdown -->
+      <div class="cpa-box" style="margin-bottom:12px">
+        <div class="cpa-days" id="cpa-days">—</div>
+        <div class="cpa-label">Days to CPA-K Exam</div>
+        <div class="cpa-chapters" id="cpa-chapters-text">Set your exam date in Settings</div>
+      </div>
+      <div class="reading-grid">
+        <div class="reading-box">
+          <div class="reading-box-title">☀️ Morning (Matatu)</div>
+          <div class="toggle-row" style="padding:4px 0">
+            <span style="font-size:13px">Done?</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="t-morning-read" onchange="saveToday();recalcScore()">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div style="margin-top:6px">
+            <input type="number" id="morning-pages" placeholder="Pages" min="0"
+              oninput="saveToday()" style="margin-bottom:6px">
+            <input type="text" id="morning-topic" placeholder="Topic (CPA-K)" oninput="saveToday()">
+          </div>
+        </div>
+        <div class="reading-box">
+          <div class="reading-box-title">🌙 Evening (AI)</div>
+          <div class="toggle-row" style="padding:4px 0">
+            <span style="font-size:13px">Done?</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="t-evening-read" onchange="saveToday();recalcScore()">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div style="margin-top:6px">
+            <input type="number" id="evening-pages" placeholder="Pages" min="0"
+              oninput="saveToday()" style="margin-bottom:6px">
+            <input type="text" id="evening-topic" placeholder="Topic (AI/Tech)" oninput="saveToday()">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+        <span class="chip gold">📖 Reading Streak: <strong id="reading-streak">0</strong> days</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. BUSINESS -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🏢</span> Business</div>
+    <div class="card">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">ShambaConnect ✓</div>
+          <div class="toggle-sub">Checked and actioned today</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-shamba" onchange="saveToday()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <span class="notes-toggle" onclick="toggleNotes('shamba-notes')">+ Add notes</span>
+      <div class="notes-area" id="shamba-notes">
+        <textarea id="shamba-notes-text" placeholder="ShambaConnect notes for today..." oninput="saveToday()"></textarea>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Meleta Dairy Farm ✓</div>
+          <div class="toggle-sub">Checked and actioned today</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-meleta" onchange="saveToday()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <span class="notes-toggle" onclick="toggleNotes('meleta-notes')">+ Add notes</span>
+      <div class="notes-area" id="meleta-notes">
+        <textarea id="meleta-notes-text" placeholder="Meleta Dairy notes for today..." oninput="saveToday()"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. FAMILY -->
+  <div class="section">
+    <div class="section-title"><span class="icon">👨‍👩‍👧</span> Family</div>
+    <div class="card">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Family Time ✅</div>
+          <div class="toggle-sub">Target: 7:30–8:30 PM (1 hr)</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="t-family" onchange="saveToday();recalcScore()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="family-row" style="margin-top:10px">
+        <span style="font-size:13px;color:var(--muted)">Hours spent</span>
+        <div class="family-hours">
+          <input type="number" id="family-hours" value="1" min="0" max="12" step="0.5"
+            oninput="saveToday()" style="width:80px">
+        </div>
+      </div>
+      <div class="slider-row" style="margin-top:10px">
+        <div class="slider-label">
+          <span>Quality Rating</span>
+          <span class="slider-val" id="family-quality-val">7</span>
+        </div>
+        <input type="range" min="1" max="10" value="7" id="family-quality"
+          oninput="document.getElementById('family-quality-val').textContent=this.value; saveToday()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Gratitude Journal -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🙏</span> Gratitude Journal</div>
+    <div class="card">
+      <div class="gratitude-item">
+        <label>Thing #1 you're grateful for</label>
+        <input type="text" id="grat-1" placeholder="I am grateful for..." oninput="saveToday()">
+      </div>
+      <div class="gratitude-item">
+        <label>Thing #2 you're grateful for</label>
+        <input type="text" id="grat-2" placeholder="I am grateful for..." oninput="saveToday()">
+      </div>
+      <div class="gratitude-item">
+        <label>Thing #3 you're grateful for</label>
+        <input type="text" id="grat-3" placeholder="I am grateful for..." oninput="saveToday()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Schedule -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📋</span> Your Daily Schedule</div>
+    <div class="card">
+      <div class="timeline" id="schedule-timeline"></div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+</div>
+
+<!-- ============================================================
+     SCREEN 2: REVIEW (daily check-in submit)
+     ============================================================ -->
+<div id="screen-review" class="screen">
+  <div class="tab-header">📝 Daily Check-In</div>
+  <div class="sub-header">Review everything and lock in your day's record.</div>
+
+  <!-- Score summary -->
+  <div class="section">
+    <div class="card" style="text-align:center">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:4px">Today's Better Man Score</div>
+      <div style="font-size:56px;font-weight:900;color:var(--gold)" id="review-score">0</div>
+      <div style="font-size:13px;color:var(--muted)">/ 100 points</div>
+      <div id="score-breakdown-list" style="margin-top:12px;text-align:left"></div>
+    </div>
+  </div>
+
+  <!-- Wake time -->
+  <div class="section">
+    <div class="section-title">⏰ Wake Time</div>
+    <div class="card">
+      <input type="time" id="actual-wake-time" value="05:00" onchange="updateWakeDisplay();saveToday()">
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">Target: 05:00 AM. Enter your actual wake time.</div>
+    </div>
+  </div>
+
+  <!-- Submit / Lock Day -->
+  <div class="submit-row">
+    <button class="btn btn-gold btn-full" onclick="lockDay()" style="font-size:16px;height:52px">
+      ✅ Submit Today's Check-In
+    </button>
+  </div>
+
+  <!-- Export Data -->
+  <div class="section">
+    <div class="card center">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Export all your data as JSON</div>
+      <button class="btn btn-outline btn-sm" onclick="exportData()">⬇ Download Data</button>
+    </div>
+  </div>
+
+  <!-- Past History -->
+  <div class="section">
+    <div class="section-title">📂 Recent History</div>
+    <div id="history-list"></div>
+  </div>
+
+  <div class="spacer"></div>
+</div>
+
+<!-- ============================================================
+     SCREEN 3: PROGRESS
+     ============================================================ -->
+<div id="screen-progress" class="screen">
+  <div class="tab-header">📊 Progress</div>
+  <div class="sub-header">Your real numbers. No fake data.</div>
+
+  <!-- Stat grid -->
+  <div class="section">
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-val" id="prog-best-score">0</div>
+        <div class="stat-label">Best Day Score</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="prog-avg-score">0</div>
+        <div class="stat-label">7-Day Average</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val text-green" id="prog-streak">0</div>
+        <div class="stat-label">Current Streak</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val text-purple" id="prog-days-tracked">0</div>
+        <div class="stat-label">Days Tracked</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Habit progress bars (from actual data) -->
+  <div class="section">
+    <div class="section-title">📈 Habit Consistency (Last 30 Days)</div>
+    <div class="card" id="habit-bars"></div>
+  </div>
+
+  <!-- Weekly heatmap -->
+  <div class="section">
+    <div class="section-title">🗓️ 28-Day Score Heatmap</div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">
+        <div style="font-size:9px;color:var(--dim);text-align:center">M</div>
+        <div style="font-size:9px;color:var(--dim);text-align:center">T</div>
+        <div style="font-size:9px;color:var(--dim);text-align:center">W</div>
+        <div style="font-size:9px;color:var(--dim);text-align:center">T</div>
+        <div style="font-size:9px;color:var(--dim);text-align:center">F</div>
+        <div style="font-size:9px;color:var(--dim);text-align:center">S</div>
+        <div style="font-size:9px;color:var(--dim);text-align:center">S</div>
+      </div>
+      <div class="heatmap" id="score-heatmap"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <span style="font-size:10px;color:var(--dim)">Less</span>
+        <div style="width:14px;height:14px;border-radius:3px;background:var(--border)"></div>
+        <div style="width:14px;height:14px;border-radius:3px;background:rgba(245,158,11,0.2)"></div>
+        <div style="width:14px;height:14px;border-radius:3px;background:rgba(245,158,11,0.5)"></div>
+        <div style="width:14px;height:14px;border-radius:3px;background:var(--gold)"></div>
+        <span style="font-size:10px;color:var(--dim)">More</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Streaks -->
+  <div class="section">
+    <div class="section-title">🔥 Sobriety Streaks</div>
+    <div class="card">
+      <div class="prog-row">
+        <div class="prog-header"><span class="prog-name">No Alcohol</span><span class="prog-pct" id="alc-streak-pct">0 / 365 days</span></div>
+        <div class="prog-bar-bg"><div class="prog-bar prog-green" id="alc-streak-bar" style="width:0%"></div></div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-header"><span class="prog-name">No Weed</span><span class="prog-pct" id="weed-streak-pct">0 / 365 days</span></div>
+        <div class="prog-bar-bg"><div class="prog-bar prog-green" id="weed-streak-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Summary -->
+  <div class="section">
+    <div class="section-title">📋 This Week's Summary</div>
+    <div class="card" id="weekly-summary"></div>
+  </div>
+
+  <!-- Score chart -->
+  <div class="section">
+    <div class="section-title">📉 Score Trend (Last 14 Days)</div>
+    <div class="card" style="padding:10px">
+      <canvas id="score-chart" height="160"></canvas>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+</div>
+
+<!-- ============================================================
+     SCREEN 4: FINANCES
+     ============================================================ -->
+<div id="screen-finances" class="screen">
+  <div class="tab-header">💰 Financial Freedom</div>
+  <div class="sub-header">Build wealth one day at a time.</div>
+
+  <!-- Freedom Meter -->
+  <div class="section">
+    <div class="freedom-meter">
+      <div class="freedom-pct" id="freedom-pct">0%</div>
+      <div class="freedom-label">Financial Freedom Score</div>
+      <div class="freedom-bar-bg">
+        <div class="freedom-bar" id="freedom-bar" style="width:0%"></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted)" id="days-to-freedom">Set your targets below to calculate</div>
+    </div>
+  </div>
+
+  <!-- Today's Finances -->
+  <div class="section">
+    <div class="section-title">📆 Today's Numbers</div>
+    <div class="card">
+      <div class="fin-row">
+        <div class="fin-item">
+          <label>Income (KES)</label>
+          <input type="number" id="fin-income" placeholder="0" oninput="saveToday();calcFinancials()">
+        </div>
+        <div class="fin-item">
+          <label>Expenses (KES)</label>
+          <input type="number" id="fin-expenses" placeholder="0" oninput="saveToday();calcFinancials()">
+        </div>
+      </div>
+      <div class="fin-row">
+        <div class="fin-item">
+          <label>Savings (KES)</label>
+          <input type="number" id="fin-savings" placeholder="Auto-calc" readonly>
+        </div>
+        <div class="fin-item">
+          <label>Savings Rate</label>
+          <input type="number" id="fin-savings-rate" placeholder="%" readonly>
+        </div>
+      </div>
+      <div class="fin-item">
+        <label>Net Worth (KES)</label>
+        <input type="number" id="fin-networth" placeholder="Total assets - liabilities" oninput="saveToday();calcFreedom()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Targets -->
+  <div class="section">
+    <div class="section-title">🎯 Your Targets</div>
+    <div class="card">
+      <div class="fin-row">
+        <div class="fin-item">
+          <label>Monthly Income Goal (KES)</label>
+          <input type="number" id="target-income" placeholder="e.g. 200000"
+            oninput="saveSettings();calcFreedom()">
+        </div>
+        <div class="fin-item">
+          <label>Net Worth Goal (KES)</label>
+          <input type="number" id="target-networth" placeholder="e.g. 10000000"
+            oninput="saveSettings();calcFreedom()">
+        </div>
+      </div>
+      <div class="fin-item">
+        <label>CPA-K Exam Date</label>
+        <input type="date" id="cpak-date" onchange="saveSettings();updateCPAK()">
+      </div>
+      <div class="fin-item" style="margin-top:10px">
+        <label>Total CPA-K Chapters</label>
+        <input type="number" id="cpak-chapters" placeholder="e.g. 18" onchange="saveSettings();updateCPAK()">
+      </div>
+      <button class="btn btn-gold btn-full mt-8" onclick="saveSettings();calcFreedom();updateCPAK()">
+        💾 Save Targets
+      </button>
+    </div>
+  </div>
+
+  <!-- Finance charts -->
+  <div class="section">
+    <div class="section-title">📊 Income vs Expenses (Last 14 Days)</div>
+    <div class="card" style="padding:10px">
+      <canvas id="fin-chart" height="180"></canvas>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📈 Net Worth Growth</div>
+    <div class="card" style="padding:10px">
+      <canvas id="nw-chart" height="160"></canvas>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+</div>
+
+<!-- ============================================================
+     BOTTOM NAVIGATION
+     ============================================================ -->
+<nav id="bottom-nav">
+  <button class="nav-btn active" id="nav-now" onclick="showScreen('now')">
+    <span class="nav-icon">⚡</span>NOW
+  </button>
+  <button class="nav-btn" id="nav-review" onclick="showScreen('review')">
+    <span class="nav-icon">📝</span>REVIEW
+  </button>
+  <button class="nav-btn" id="nav-progress" onclick="showScreen('progress')">
+    <span class="nav-icon">📊</span>PROGRESS
+  </button>
+  <button class="nav-btn" id="nav-finances" onclick="showScreen('finances')">
+    <span class="nav-icon">💰</span>FINANCES
+  </button>
+</nav>
+
+<!-- ============================================================
+     MODALS
+     ============================================================ -->
+
+<!-- WHY SKIP? -->
+<div class="overlay hidden" id="why-skip-modal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('why-skip-modal')">✕</button>
+    <div class="celebration">
+      <div class="celebration-icon">🔥</div>
+      <div class="celebration-text">Remember Why You Started</div>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:12px;font-size:15px;color:var(--text);line-height:1.7">
+        <strong style="color:var(--gold)">Financial freedom</strong> for your family.<br>
+        <strong style="color:var(--gold)">Becoming the man</strong> your daughter needs.<br>
+        <strong style="color:var(--gold)">CPA-K certification</strong> — your professional legacy.<br>
+        <strong style="color:var(--gold)">Breaking free</strong> from addiction for good.<br>
+        <strong style="color:var(--gold)">Building generational wealth</strong> at Meleta Farm.
+      </p>
+      <p style="font-size:13px;color:var(--muted)">
+        Every time you skip, you are not just skipping a task — you are delaying the life you deserve. 
+        The future Boniface is counting on the decision you make right now.
+      </p>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="closeModal('why-skip-modal')">
+      💪 I'll Do It
+    </button>
+    <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="openHelpModal();closeModal('why-skip-modal')">
+      🆘 I Need Help First
+    </button>
+  </div>
+</div>
+
+<!-- HELP / SOS -->
+<div class="overlay hidden" id="help-modal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('help-modal')">✕</button>
+    <div class="modal-title">🆘 I Need Support</div>
+    <div class="modal-body">You're not alone. Take one of these steps right now.</div>
+
+    <!-- Breathing Exercise -->
+    <div class="card" style="margin-bottom:12px;text-align:center">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px">🌬️ 2-Minute Breathing</div>
+      <div class="breath-circle" id="breath-circle">Tap to start</div>
+      <div id="breath-instruction" style="font-size:13px;color:var(--muted);margin-top:6px"></div>
+      <button class="btn btn-outline btn-sm mt-8" onclick="startBreathing()">Start Breathing Exercise</button>
+    </div>
+
+    <!-- Remember My Why -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:14px;font-weight:700;color:var(--gold);margin-bottom:6px">💡 Remember Your Why</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7">
+        You are building a future where your family never worries about money.<br>
+        Where your daughter looks up to you with pride.<br>
+        Where Meleta Farm feeds and funds your next generation.<br>
+        This moment of struggle is the price of that life.
+      </div>
+    </div>
+
+    <!-- Text wife -->
+    <a href="sms:?body=Hey%20love%2C%20I%20just%20wanted%20to%20say%20I%20love%20you%20and%20I%27m%20working%20hard%20for%20us%20%F0%9F%92%AA" class="btn btn-green btn-full" style="text-decoration:none;margin-bottom:8px">
+      💌 Text My Wife
+    </a>
+
+    <button class="btn btn-gold btn-full" onclick="closeModal('help-modal')">I'm Ready to Continue</button>
+  </div>
+</div>
+
+<!-- TIMER MODAL -->
+<div class="overlay hidden" id="timer-modal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="stopTimer();closeModal('timer-modal')">✕</button>
+    <div class="modal-title" id="timer-task-title">Task Timer</div>
+    <div class="timer-display" id="timer-display">00:00:00</div>
+    <div class="timer-controls">
+      <button class="btn btn-gold" id="timer-start-btn" onclick="toggleTimer()">▶ Start</button>
+      <button class="btn btn-outline" onclick="resetTimer()">↺ Reset</button>
+      <button class="btn btn-green" onclick="completeTimedTask()">✅ Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY DETAIL MODAL -->
+<div class="overlay hidden" id="history-modal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('history-modal')">✕</button>
+    <div class="modal-title" id="history-modal-title">Past Day</div>
+    <div id="history-modal-content" style="font-size:13px;line-height:1.8;color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- STREAK CELEBRATION -->
+<div class="overlay hidden" id="celebration-modal">
+  <div class="modal" style="position:relative;text-align:center">
+    <button class="modal-close" onclick="closeModal('celebration-modal')">✕</button>
+    <div id="celebration-content"></div>
+    <button class="btn btn-gold btn-full" onclick="closeModal('celebration-modal')">🚀 Keep Going!</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const QUOTES = [
+  "The man who masters himself masters the world.",
+  "Discipline is choosing between what you want now and what you want most.",
+  "Financial freedom isn't given — it's built one day at a time.",
+  "Your habits define your future.",
+  "The best time to start was yesterday. The next best time is now.",
+  "Success is the sum of small efforts repeated day in, day out.",
+  "Be the man your daughter tells her friends about.",
+];
+
+const AFFIRMATIONS = [
+  "I am becoming the man my family needs.",
+  "I choose discipline over comfort, every single day.",
+  "My CPA-K success is inevitable — I show up every day.",
+  "I am building generational wealth at Meleta Farm.",
+  "I am sober, sharp, and in control of my destiny.",
+  "Every sacrifice I make today is an investment in my family's future.",
+  "ShambaConnect is growing because I am growing.",
+  "I am the provider, the protector, and the leader of my home.",
+];
+
+// Schedule: [{start, label, sub}]
+const SCHEDULE = [
+  { start: "05:00", end: "05:15", label: "Wake Up + Morning Workout", sub: "Pushups, situps, stretches" },
+  { start: "05:15", end: "05:30", label: "Cold Shower + Breakfast", sub: "Fuel your body for the day" },
+  { start: "06:00", end: "08:30", label: "📚 CPA-K Studies (Matatu)", sub: "Morning reading — critical" },
+  { start: "08:30", end: "17:00", label: "💼 Work", sub: "Shirland Insights / Karson Shell" },
+  { start: "17:00", end: "19:30", label: "🚌 Commute Home", sub: "Audio learning / podcast" },
+  { start: "19:30", end: "20:30", label: "👨‍👩‍👧 Family Time", sub: "Be fully present" },
+  { start: "20:30", end: "21:30", label: "🤖 AI / Tech Reading", sub: "Evening reading session" },
+  { start: "21:30", end: "22:00", label: "🏢 Business Checks", sub: "ShambaConnect + Meleta Dairy" },
+];
+
+const SCORE_MAP = {
+  wake:      { label: "5AM Wake-up",     points: 10 },
+  workout:   { label: "Morning Workout", points: 10 },
+  shower:    { label: "Cold Shower",     points: 10 },
+  breakfast: { label: "Breakfast",       points: 10 },
+  morningRead: { label: "Morning Reading", points: 15 },
+  eveningRead: { label: "Evening Reading", points: 15 },
+  alcohol:   { label: "No Alcohol",      points: 10 },
+  weed:      { label: "No Weed",         points: 10 },
+  family:    { label: "Family Time",     points: 10 },
+};
+
+const STREAK_MILESTONES = [
+  { days: 7,   emoji: "🔥", text: "1 Week Streak!" },
+  { days: 30,  emoji: "🏆", text: "1 Month Streak!" },
+  { days: 90,  emoji: "💪", text: "90 Days Strong!" },
+  { days: 180, emoji: "🌟", text: "Half a Year!" },
+  { days: 365, emoji: "👑", text: "1 FULL YEAR! LEGENDARY!" },
+];
+
+// ============================================================
+// STORAGE HELPERS
+// ============================================================
+const TODAY = () => new Date().toISOString().split("T")[0];
+
+function getAll() {
+  try { return JSON.parse(localStorage.getItem("ff_data") || "{}"); } catch { return {}; }
+}
+function saveAll(data) { localStorage.setItem("ff_data", JSON.stringify(data)); }
+
+function getDay(date) {
+  return getAll()[date] || null;
+}
+
+function setDay(date, obj) {
+  const all = getAll();
+  all[date] = { ...all[date], ...obj };
+  saveAll(all);
+}
+
+function getSettings() {
+  try { return JSON.parse(localStorage.getItem("ff_settings") || "{}"); } catch { return {}; }
+}
+function saveSettingsObj(obj) { localStorage.setItem("ff_settings", JSON.stringify({ ...getSettings(), ...obj })); }
+
+// ============================================================
+// TODAY STATE — we build a current-day object and sync to storage
+// ============================================================
+let todayData = {};
+let quoteIndex = 0;
+let affirmIndex = 0;
+
+function loadToday() {
+  const stored = getDay(TODAY());
+  if (stored) {
+    todayData = stored;
+  } else {
+    todayData = { date: TODAY() };
+  }
+  applyToUI();
+}
+
+function applyToUI() {
+  const d = todayData;
+  setToggle("t-wake",       d.wake);
+  setToggle("t-workout",    d.workout?.done);
+  setToggle("t-shower",     d.coldShower);
+  setToggle("t-breakfast",  d.breakfast);
+  setToggle("t-alcohol",    d.noAlcohol);
+  setToggle("t-weed",       d.noWeed);
+  setToggle("t-morning-read", d.morningRead?.done);
+  setToggle("t-evening-read", d.eveningRead?.done);
+  setToggle("t-shamba",     d.shambaConnect?.checked);
+  setToggle("t-meleta",     d.meletaDairy?.checked);
+  setToggle("t-family",     d.familyTime?.done);
+
+  setVal("pushups-val",     d.workout?.pushups || 0);
+  setVal("situps-val",      d.workout?.situps  || 0);
+  setInp("morning-pages",   d.morningRead?.pages || "");
+  setInp("morning-topic",   d.morningRead?.topic || "");
+  setInp("evening-pages",   d.eveningRead?.pages || "");
+  setInp("evening-topic",   d.eveningRead?.topic || "");
+  setInp("shamba-notes-text", d.shambaConnect?.notes || "");
+  setInp("meleta-notes-text", d.meletaDairy?.notes  || "");
+  setInp("grat-1", (d.gratitude || [])[0] || "");
+  setInp("grat-2", (d.gratitude || [])[1] || "");
+  setInp("grat-3", (d.gratitude || [])[2] || "");
+  setInp("actual-wake-time", d.wakeTime || "05:00");
+  setInp("family-hours",    d.familyTime?.hours || 1);
+  setInp("fin-income",      d.income || "");
+  setInp("fin-expenses",    d.expenses || "");
+  setInp("fin-networth",    d.netWorth || "");
+
+  if (d.mood) selectMood(d.mood, false);
+  setSlider("stress-slider",   "stress-val",         d.stress   ?? 5);
+  setSlider("craving-slider",  "craving-val",        d.craving  ?? 0);
+  setSlider("family-quality",  "family-quality-val", d.familyTime?.quality ?? 7);
+
+  recalcScore();
+  updateSobriety();
+  calcFinancials();
+}
+
+function saveToday() {
+  const d = {
+    date: TODAY(),
+    wake:       getToggle("t-wake"),
+    coldShower: getToggle("t-shower"),
+    breakfast:  getToggle("t-breakfast"),
+    noAlcohol:  getToggle("t-alcohol"),
+    noWeed:     getToggle("t-weed"),
+    wakeTime:   getInp("actual-wake-time"),
+    mood:       todayData.mood || null,
+    stress:     +getInp("stress-slider") || 5,
+    craving:    +getInp("craving-slider") || 0,
+    workout: {
+      done:    getToggle("t-workout"),
+      pushups: +(document.getElementById("pushups-val").textContent) || 0,
+      situps:  +(document.getElementById("situps-val").textContent)  || 0,
+    },
+    morningRead: {
+      done:  getToggle("t-morning-read"),
+      pages: +getInp("morning-pages") || 0,
+      topic: getInp("morning-topic"),
+    },
+    eveningRead: {
+      done:  getToggle("t-evening-read"),
+      pages: +getInp("evening-pages") || 0,
+      topic: getInp("evening-topic"),
+    },
+    shambaConnect: {
+      checked: getToggle("t-shamba"),
+      notes:   getInp("shamba-notes-text"),
+    },
+    meletaDairy: {
+      checked: getToggle("t-meleta"),
+      notes:   getInp("meleta-notes-text"),
+    },
+    familyTime: {
+      done:    getToggle("t-family"),
+      hours:   +getInp("family-hours") || 0,
+      quality: +getInp("family-quality") || 7,
+    },
+    gratitude: [getInp("grat-1"), getInp("grat-2"), getInp("grat-3")],
+    income:    +getInp("fin-income") || 0,
+    expenses:  +getInp("fin-expenses") || 0,
+    netWorth:  +getInp("fin-networth") || 0,
+  };
+  todayData = { ...todayData, ...d };
+  setDay(TODAY(), todayData);
+  recalcScore();
+}
+
+// ============================================================
+// SCORE CALCULATION
+// ============================================================
+function calcScore(d) {
+  if (!d) return 0;
+  let score = 0;
+  if (d.wake)              score += SCORE_MAP.wake.points;
+  if (d.workout?.done)     score += SCORE_MAP.workout.points;
+  if (d.coldShower)        score += SCORE_MAP.shower.points;
+  if (d.breakfast)         score += SCORE_MAP.breakfast.points;
+  if (d.morningRead?.done) score += SCORE_MAP.morningRead.points;
+  if (d.eveningRead?.done) score += SCORE_MAP.eveningRead.points;
+  if (d.noAlcohol)         score += SCORE_MAP.alcohol.points;
+  if (d.noWeed)            score += SCORE_MAP.weed.points;
+  if (d.familyTime?.done)  score += SCORE_MAP.family.points;
+  return Math.min(score, 100);
+}
+
+function recalcScore() {
+  const s = calcScore(todayData);
+  todayData.dailyScore = s;
+  setText("today-score", s);
+  setText("review-score", s);
+
+  // Streak
+  const streak = calcStreak();
+  setText("main-streak", streak);
+  setText("prog-streak", streak);
+
+  // Badge
+  const badge = getStreakBadge(streak);
+  const badgeEl = document.getElementById("streak-badge-main");
+  badgeEl.innerHTML = badge ? `<span class="streak-badge">${badge}</span>` : "";
+
+  // Score breakdown on review page
+  const bd = document.getElementById("score-breakdown-list");
+  if (bd) {
+    let html = "";
+    const keys = { wake:"wake", workout:"workout", shower:"coldShower", breakfast:"breakfast",
+                   morningRead:"morningRead", eveningRead:"eveningRead", alcohol:"noAlcohol",
+                   weed:"noWeed", family:"familyTime" };
+    for (const [key, dataKey] of Object.entries(keys)) {
+      const done = key === "workout"    ? todayData.workout?.done
+                 : key === "morningRead" ? todayData.morningRead?.done
+                 : key === "eveningRead" ? todayData.eveningRead?.done
+                 : key === "family"      ? todayData.familyTime?.done
+                 : todayData[dataKey];
+      const m = SCORE_MAP[key];
+      html += `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span>${done ? "✅" : "⬜"} ${m.label}</span>
+        <span style="color:${done?'var(--gold)':'var(--dim)'}">+${m.points}</span>
+      </div>`;
+    }
+    html += `<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:15px;font-weight:700">
+      <span>Total</span><span style="color:var(--gold)">${s} / 100</span>
+    </div>`;
+    bd.innerHTML = html;
+  }
+}
+
+// ============================================================
+// STREAK LOGIC
+// ============================================================
+function calcStreak() {
+  const all = getAll();
+  const dates = Object.keys(all).sort().reverse();
+  let streak = 0;
+  const today = TODAY();
+  for (const d of dates) {
+    if (d > today) continue;
+    const day = all[d];
+    const s = calcScore(day);
+    // count as streak day if score >= 50
+    if (s >= 50) { streak++; }
+    else { break; }
+  }
+  return streak;
+}
+
+function calcSobrietyStreak(field) {
+  const all = getAll();
+  const dates = Object.keys(all).sort().reverse();
+  let streak = 0;
+  for (const d of dates) {
+    if (d > TODAY()) continue;
+    if (all[d][field]) { streak++; }
+    else break;
+  }
+  return streak;
+}
+
+function getStreakBadge(streak) {
+  for (const m of [...STREAK_MILESTONES].reverse()) {
+    if (streak >= m.days) return `${m.emoji} ${m.text}`;
+  }
+  return null;
+}
+
+// ============================================================
+// SOBRIETY DISPLAY
+// ============================================================
+function updateSobriety() {
+  const alcDays  = calcSobrietyStreak("noAlcohol");
+  const weedDays = calcSobrietyStreak("noWeed");
+
+  setText("alcohol-days", alcDays);
+  setText("weed-days",    weedDays);
+
+  const alcPct  = Math.min((alcDays / 365) * 100, 100).toFixed(1);
+  const weedPct = Math.min((weedDays / 365) * 100, 100).toFixed(1);
+
+  document.getElementById("alcohol-bar").style.width = alcPct + "%";
+  document.getElementById("weed-bar").style.width    = weedPct + "%";
+
+  // Progress screen
+  const alcEl  = document.getElementById("alc-streak-pct");
+  const weedEl = document.getElementById("weed-streak-pct");
+  const alcBar  = document.getElementById("alc-streak-bar");
+  const weedBar = document.getElementById("weed-streak-bar");
+  if (alcEl)  alcEl.textContent  = `${alcDays} / 365 days`;
+  if (weedEl) weedEl.textContent = `${weedDays} / 365 days`;
+  if (alcBar)  alcBar.style.width  = alcPct + "%";
+  if (weedBar) weedBar.style.width = weedPct + "%";
+
+  checkStreakCelebration(alcDays);
+  checkStreakCelebration(weedDays);
+}
+
+function checkStreakCelebration(days) {
+  const last = parseInt(localStorage.getItem("ff_last_celebrate") || "0");
+  for (const m of STREAK_MILESTONES) {
+    if (days === m.days && last !== days) {
+      localStorage.setItem("ff_last_celebrate", days);
+      showCelebration(m);
+    }
+  }
+}
+
+function showCelebration(m) {
+  document.getElementById("celebration-content").innerHTML = `
+    <div class="celebration">
+      <div class="celebration-icon">${m.emoji}</div>
+      <div class="celebration-text">${m.text}</div>
+      <p style="color:var(--muted);margin-top:10px;font-size:14px">Boniface, you are unstoppable. Keep going!</p>
+    </div>`;
+  openModal("celebration-modal");
+}
+
+// ============================================================
+// CPA-K COUNTDOWN
+// ============================================================
+function updateCPAK() {
+  const s    = getSettings();
+  const date = s.cpakDate || document.getElementById("cpak-date")?.value;
+  const chapters = s.cpakChapters || +document.getElementById("cpak-chapters")?.value || 18;
+
+  if (!date) {
+    setText("cpa-days", "—");
+    setText("cpa-chapters-text", "Set your CPA-K exam date in Finances tab");
+    return;
+  }
+
+  const target = new Date(date);
+  const now    = new Date();
+  const diff   = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+
+  if (diff <= 0) {
+    setText("cpa-days", "0");
+    setText("cpa-chapters-text", "🎓 Exam day! You've got this, Boniface!");
+    return;
+  }
+
+  setText("cpa-days", diff);
+  const chaptersPerDay = (chapters / diff).toFixed(2);
+  setText("cpa-chapters-text", `📖 Read ${chaptersPerDay} chapter(s)/day to finish in time`);
+}
+
+// ============================================================
+// FINANCIAL CALCULATIONS
+// ============================================================
+function calcFinancials() {
+  const income   = +getInp("fin-income")   || 0;
+  const expenses = +getInp("fin-expenses") || 0;
+  const savings  = income - expenses;
+  const rate     = income > 0 ? ((savings / income) * 100).toFixed(1) : 0;
+
+  document.getElementById("fin-savings").value      = savings;
+  document.getElementById("fin-savings-rate").value = rate + "%";
+
+  todayData.savings     = savings;
+  todayData.savingsRate = +rate;
+  calcFreedom();
+}
+
+function calcFreedom() {
+  const s = getSettings();
+  const nw        = +getInp("fin-networth") || todayData.netWorth || 0;
+  const targetNW  = +getInp("target-networth") || s.targetNetWorth || 0;
+
+  let pct = 0;
+  if (targetNW > 0) pct = Math.min((nw / targetNW) * 100, 100).toFixed(1);
+
+  setText("freedom-pct", pct + "%");
+  document.getElementById("freedom-bar").style.width = pct + "%";
+
+  const tIncome   = +getInp("target-income") || s.targetIncome || 0;
+  const todayIncome = +getInp("fin-income") || 0;
+  const daysSaved = nw > 0 && tIncome > 0
+    ? Math.ceil((targetNW - nw) / ((todayIncome || tIncome) * 0.3))
+    : null;
+
+  setText("days-to-freedom", daysSaved
+    ? `Estimated ${daysSaved} days to financial freedom`
+    : "Complete your income and target fields to calculate");
+}
+
+function saveSettings() {
+  saveSettingsObj({
+    targetIncome:   +getInp("target-income")   || 0,
+    targetNetWorth: +getInp("target-networth")  || 0,
+    cpakDate:       getInp("cpak-date"),
+    cpakChapters:   +getInp("cpak-chapters")   || 18,
+  });
+}
+
+function loadSettings() {
+  const s = getSettings();
+  setInp("target-income",   s.targetIncome || "");
+  setInp("target-networth", s.targetNetWorth || "");
+  setInp("cpak-date",       s.cpakDate || "");
+  setInp("cpak-chapters",   s.cpakChapters || "");
+}
+
+// ============================================================
+// LOCK DAY (submit review)
+// ============================================================
+function lockDay() {
+  saveToday();
+  todayData.locked = true;
+  todayData.dailyScore = calcScore(todayData);
+  setDay(TODAY(), todayData);
+  renderHistory();
+  renderProgress();
+  renderCharts();
+  alert(`✅ Day locked! Score: ${todayData.dailyScore}/100\n\n${getScoreMessage(todayData.dailyScore)}`);
+}
+
+function getScoreMessage(score) {
+  if (score >= 90) return "🏆 ELITE DAY! You are the man, Boniface!";
+  if (score >= 70) return "💪 Solid day. Keep building!";
+  if (score >= 50) return "📈 Good start. Tomorrow push harder.";
+  return "⚠️ Below average. Reflect and recommit tonight.";
+}
+
+// ============================================================
+// EXPORT DATA
+// ============================================================
+function exportData() {
+  const data = { records: getAll(), settings: getSettings(), exported: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `focusframe-${TODAY()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// SCHEDULE TIMELINE
+// ============================================================
+function renderSchedule() {
+  const now  = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const toMins = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+  let currentIdx = -1;
+  for (let i = 0; i < SCHEDULE.length; i++) {
+    const s = toMins(SCHEDULE[i].start);
+    const e = toMins(SCHEDULE[i].end);
+    if (mins >= s && mins < e) { currentIdx = i; break; }
+  }
+
+  // If before first or after last, show next
+  if (currentIdx === -1) {
+    if (mins < toMins(SCHEDULE[0].start)) currentIdx = 0;
+    else currentIdx = SCHEDULE.length - 1;
+  }
+
+  // Update current task banner
+  const cur = SCHEDULE[currentIdx];
+  setText("current-task-name", cur.label);
+  setText("current-task-time", `${cur.start} – ${cur.end}`);
+  document.getElementById("timer-task-title").textContent = cur.label;
+
+  // Render timeline
+  const tl = document.getElementById("schedule-timeline");
+  tl.innerHTML = SCHEDULE.map((item, i) => {
+    const done = toMins(item.end) < mins;
+    const isCur = i === currentIdx;
+    return `<div class="tl-item ${isCur ? 'current' : ''}">
+      <div class="tl-time">${item.start}</div>
+      <div class="tl-dot ${done ? 'done' : isCur ? 'current-dot' : ''}"></div>
+      <div>
+        <div class="tl-name">${item.label}</div>
+        <div class="tl-sub">${item.sub}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+function renderHistory() {
+  const all   = getAll();
+  const dates = Object.keys(all).sort().reverse().slice(0, 30);
+  const list  = document.getElementById("history-list");
+  if (!list) return;
+
+  if (dates.length === 0) {
+    list.innerHTML = `<div class="card center text-muted" style="padding:20px">No history yet. Complete your first check-in!</div>`;
+    return;
+  }
+
+  list.innerHTML = dates.map(d => {
+    const day   = all[d];
+    const score = calcScore(day);
+    const color = score >= 70 ? "var(--green)" : score >= 50 ? "var(--gold)" : "var(--red)";
+    return `<div class="history-item" onclick="showHistoryDetail('${d}')">
+      <div>
+        <div class="history-date">${formatDate(d)}</div>
+        <div style="font-size:11px;color:var(--dim)">${scoreChips(day)}</div>
+      </div>
+      <div class="history-score" style="color:${color}">${score}</div>
+    </div>`;
+  }).join("");
+}
+
+function scoreChips(d) {
+  const parts = [];
+  if (d.noAlcohol)         parts.push("🛡️");
+  if (d.noWeed)            parts.push("🌿");
+  if (d.workout?.done)     parts.push("💪");
+  if (d.morningRead?.done) parts.push("📚");
+  if (d.familyTime?.done)  parts.push("👨‍👩‍👧");
+  return parts.join(" ") || "—";
+}
+
+function showHistoryDetail(date) {
+  const d = getDay(date);
+  if (!d) return;
+  const score = calcScore(d);
+  document.getElementById("history-modal-title").textContent = formatDate(date) + " — " + score + "/100";
+  document.getElementById("history-modal-content").innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <div>⏰ Wake: <strong>${d.wakeTime || "?"}</strong></div>
+      <div>💪 Workout: <strong>${d.workout?.done ? "✅" : "❌"}</strong></div>
+      <div>❄️ Shower: <strong>${d.coldShower ? "✅" : "❌"}</strong></div>
+      <div>🍳 Breakfast: <strong>${d.breakfast ? "✅" : "❌"}</strong></div>
+      <div>📚 AM Read: <strong>${d.morningRead?.done ? d.morningRead.pages + "p" : "❌"}</strong></div>
+      <div>🤖 PM Read: <strong>${d.eveningRead?.done ? d.eveningRead.pages + "p" : "❌"}</strong></div>
+      <div>🍺 No Alcohol: <strong>${d.noAlcohol ? "✅" : "❌"}</strong></div>
+      <div>🌿 No Weed: <strong>${d.noWeed ? "✅" : "❌"}</strong></div>
+      <div>👨‍👩‍👧 Family: <strong>${d.familyTime?.done ? d.familyTime.hours + "h" : "❌"}</strong></div>
+      <div>😊 Mood: <strong>${d.mood || "—"}</strong></div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--dim)">
+      <div>💰 Income: KES ${(d.income||0).toLocaleString()}</div>
+      <div>💸 Expenses: KES ${(d.expenses||0).toLocaleString()}</div>
+      <div>💎 Net Worth: KES ${(d.netWorth||0).toLocaleString()}</div>
+    </div>
+    ${d.gratitude?.filter(Boolean).length ? `
+    <div style="margin-top:12px">
+      <div style="font-size:12px;color:var(--gold);margin-bottom:4px">Gratitude</div>
+      ${d.gratitude.filter(Boolean).map(g => `<div style="font-size:12px;color:var(--muted)">• ${g}</div>`).join("")}
+    </div>` : ""}`;
+  openModal("history-modal");
+}
+
+function formatDate(str) {
+  if (!str) return "";
+  const d = new Date(str + "T12:00:00");
+  return d.toLocaleDateString("en-KE", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+
+// ============================================================
+// PROGRESS SCREEN
+// ============================================================
+function renderProgress() {
+  const all   = getAll();
+  const dates = Object.keys(all).sort().reverse();
+
+  // Stats
+  const scores  = dates.map(d => calcScore(all[d]));
+  const best    = scores.length ? Math.max(...scores) : 0;
+  const last7   = scores.slice(0, 7);
+  const avg7    = last7.length ? Math.round(last7.reduce((a, b) => a + b, 0) / last7.length) : 0;
+
+  setText("prog-best-score",   best);
+  setText("prog-avg-score",    avg7);
+  setText("prog-days-tracked", dates.length);
+
+  // Habit bars (last 30 days)
+  const last30 = dates.slice(0, 30);
+  const habits = [
+    { label: "5AM Wake",        fn: d => d.wake,             cls: "prog-gold" },
+    { label: "Workout",         fn: d => d.workout?.done,    cls: "prog-green" },
+    { label: "Cold Shower",     fn: d => d.coldShower,       cls: "prog-blue" },
+    { label: "Morning Read",    fn: d => d.morningRead?.done,cls: "prog-purple" },
+    { label: "Evening Read",    fn: d => d.eveningRead?.done,cls: "prog-purple" },
+    { label: "No Alcohol",      fn: d => d.noAlcohol,        cls: "prog-green" },
+    { label: "No Weed",         fn: d => d.noWeed,           cls: "prog-green" },
+    { label: "Family Time",     fn: d => d.familyTime?.done, cls: "prog-gold" },
+  ];
+
+  const hb = document.getElementById("habit-bars");
+  if (hb && last30.length > 0) {
+    hb.innerHTML = habits.map(h => {
+      const done = last30.filter(d => h.fn(all[d])).length;
+      const pct  = Math.round((done / last30.length) * 100);
+      return `<div class="prog-row">
+        <div class="prog-header">
+          <span class="prog-name">${h.label}</span>
+          <span class="prog-pct">${pct}% (${done}/${last30.length})</span>
+        </div>
+        <div class="prog-bar-bg">
+          <div class="prog-bar ${h.cls}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+    }).join("");
+  } else if (hb) {
+    hb.innerHTML = `<div class="center text-muted" style="padding:20px">No data yet. Start tracking!</div>`;
+  }
+
+  // Heatmap (28 days)
+  const hm = document.getElementById("score-heatmap");
+  if (hm) {
+    const hm28 = [];
+    // Fill 28 slots from today backwards
+    for (let i = 27; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split("T")[0];
+      const score = all[key] ? calcScore(all[key]) : -1;
+      hm28.push({ score, key });
+    }
+    hm.innerHTML = hm28.map(({ score }) => {
+      const cls = score < 0 ? "heat-0" : score >= 80 ? "heat-3" : score >= 60 ? "heat-2" : score >= 40 ? "heat-1" : "heat-0";
+      const label = score >= 0 ? score : "";
+      return `<div class="heat-day ${cls}">${label}</div>`;
+    }).join("");
+  }
+
+  // Weekly summary
+  const ws = document.getElementById("weekly-summary");
+  if (ws) {
+    const week = dates.slice(0, 7).reverse();
+    if (week.length === 0) {
+      ws.innerHTML = `<div class="center text-muted">Complete a full week to see your summary.</div>`;
+    } else {
+      const wScores = week.map(d => calcScore(all[d]));
+      const wAvg = Math.round(wScores.reduce((a, b) => a + b, 0) / wScores.length);
+      const wPages = week.reduce((a, d) => a + (all[d].morningRead?.pages || 0) + (all[d].eveningRead?.pages || 0), 0);
+      ws.innerHTML = `
+        <div class="stat-grid">
+          <div class="stat-box"><div class="stat-val">${wAvg}</div><div class="stat-label">Avg Score</div></div>
+          <div class="stat-box"><div class="stat-val text-purple">${wPages}</div><div class="stat-label">Pages Read</div></div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted)">
+          ${week.map(d => {
+            const s = calcScore(all[d]);
+            const color = s >= 70 ? "var(--green)" : s >= 50 ? "var(--gold)" : "var(--red)";
+            return `<div style="display:flex;justify-content:space-between;padding:3px 0">
+              <span>${formatDate(d)}</span><span style="color:${color};font-weight:700">${s}/100</span>
+            </div>`;
+          }).join("")}
+        </div>`;
+    }
+  }
+
+  updateSobriety();
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+let scoreChartInst = null;
+let finChartInst   = null;
+let nwChartInst    = null;
+
+function renderCharts() {
+  const all   = getAll();
+  const dates = Object.keys(all).sort().slice(-14);
+
+  // Score trend
+  const scoreCtx = document.getElementById("score-chart");
+  if (scoreCtx) {
+    if (scoreChartInst) scoreChartInst.destroy();
+    scoreChartInst = new Chart(scoreCtx, {
+      type: "line",
+      data: {
+        labels: dates.map(d => d.slice(5)),
+        datasets: [{
+          label: "Better Man Score",
+          data: dates.map(d => calcScore(all[d])),
+          borderColor: "#f59e0b",
+          backgroundColor: "rgba(245,158,11,0.1)",
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: "#f59e0b",
+          pointRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#64748b", font: { size: 10 } }, grid: { color: "#1e293b" } },
+          y: { min: 0, max: 100, ticks: { color: "#64748b", font: { size: 10 } }, grid: { color: "#1e293b" } }
+        }
+      }
+    });
+  }
+
+  // Finance chart
+  const finCtx = document.getElementById("fin-chart");
+  if (finCtx) {
+    if (finChartInst) finChartInst.destroy();
+    finChartInst = new Chart(finCtx, {
+      type: "bar",
+      data: {
+        labels: dates.map(d => d.slice(5)),
+        datasets: [
+          {
+            label: "Income",
+            data: dates.map(d => all[d]?.income || 0),
+            backgroundColor: "rgba(16,185,129,0.7)",
+          },
+          {
+            label: "Expenses",
+            data: dates.map(d => all[d]?.expenses || 0),
+            backgroundColor: "rgba(239,68,68,0.7)",
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: "#94a3b8", font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: "#64748b", font: { size: 10 } }, grid: { color: "#1e293b" } },
+          y: { ticks: { color: "#64748b", font: { size: 10 } }, grid: { color: "#1e293b" } }
+        }
+      }
+    });
+  }
+
+  // Net worth chart
+  const nwCtx = document.getElementById("nw-chart");
+  if (nwCtx) {
+    if (nwChartInst) nwChartInst.destroy();
+    nwChartInst = new Chart(nwCtx, {
+      type: "line",
+      data: {
+        labels: dates.map(d => d.slice(5)),
+        datasets: [{
+          label: "Net Worth (KES)",
+          data: dates.map(d => all[d]?.netWorth || 0),
+          borderColor: "#8b5cf6",
+          backgroundColor: "rgba(139,92,246,0.1)",
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: "#8b5cf6",
+          pointRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#64748b", font: { size: 10 } }, grid: { color: "#1e293b" } },
+          y: { ticks: { color: "#64748b", font: { size: 10 } }, grid: { color: "#1e293b" } }
+        }
+      }
+    });
+  }
+}
+
+// ============================================================
+// MOOD SELECTION
+// ============================================================
+function selectMood(mood, persist = true) {
+  const moods = ["happy", "neutral", "sad", "angry", "anxious"];
+  moods.forEach(m => {
+    const el = document.getElementById("mood-" + m);
+    if (el) el.classList.toggle("selected", m === mood);
+  });
+  if (persist) {
+    todayData.mood = mood;
+    saveToday();
+  }
+}
+
+// ============================================================
+// COUNTERS
+// ============================================================
+function changeCount(id, delta) {
+  const el  = document.getElementById(id + "-val");
+  const val = Math.max(0, (parseInt(el.textContent) || 0) + delta);
+  el.textContent = val;
+  saveToday();
+}
+
+// ============================================================
+// NOTES TOGGLE
+// ============================================================
+function toggleNotes(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle("open");
+}
+
+// ============================================================
+// CLOCK & DATE
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  const hh  = String(now.getHours()).padStart(2, "0");
+  const mm  = String(now.getMinutes()).padStart(2, "0");
+  const ss  = String(now.getSeconds()).padStart(2, "0");
+  setText("live-clock", `${hh}:${mm}:${ss}`);
+  setText("live-date", now.toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "short" }));
+}
+
+// ============================================================
+// QUOTES & AFFIRMATIONS
+// ============================================================
+function rotateQuote() {
+  setText("rotating-quote", QUOTES[quoteIndex % QUOTES.length]);
+  quoteIndex++;
+}
+
+function nextAffirmation() {
+  affirmIndex = (affirmIndex + 1) % AFFIRMATIONS.length;
+  document.getElementById("affirmation-box").innerHTML =
+    `"${AFFIRMATIONS[affirmIndex]}"<div class="affirmation-hint">Tap to cycle ↺</div>`;
+}
+
+function updateWakeDisplay() {
+  const v = getInp("actual-wake-time") || "05:00";
+  const el = document.getElementById("wake-display");
+  if (el) el.textContent = v <= "05:05" ? `✅ On time (${v})` : `⚠️ Late wake: ${v}`;
+}
+
+// ============================================================
+// TIMER
+// ============================================================
+let timerInterval = null;
+let timerSeconds  = 0;
+let timerRunning  = false;
+
+function openTimerModal() { openModal("timer-modal"); }
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    setText("timer-start-btn", "▶ Resume");
+  } else {
+    timerRunning = true;
+    setText("timer-start-btn", "⏸ Pause");
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      const h = Math.floor(timerSeconds / 3600);
+      const m = Math.floor((timerSeconds % 3600) / 60);
+      const s = timerSeconds % 60;
+      setText("timer-display",
+        `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`);
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  stopTimer();
+  timerSeconds = 0;
+  setText("timer-display", "00:00:00");
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  setText("timer-start-btn", "▶ Start");
+}
+
+function completeTimedTask() {
+  stopTimer();
+  closeModal("timer-modal");
+  alert(`✅ Task completed! Time: ${document.getElementById("timer-display").textContent}\n\nWell done, Boniface!`);
+}
+
+// ============================================================
+// BREATHING EXERCISE
+// ============================================================
+let breathPhase = null;
+let breathInt   = null;
+
+function startBreathing() {
+  let count = 0;
+  const phases = [
+    { dur: 4000, text: "Inhale...",    expand: true  },
+    { dur: 4000, text: "Hold...",      expand: true  },
+    { dur: 4000, text: "Exhale...",    expand: false },
+    { dur: 2000, text: "Rest...",      expand: false },
+  ];
+  let p = 0;
+  const circle = document.getElementById("breath-circle");
+  const instr  = document.getElementById("breath-instruction");
+  const run = () => {
+    const phase = phases[p % phases.length];
+    if (circle) {
+      circle.textContent = phase.text;
+      circle.classList.toggle("expand", phase.expand);
+      circle.classList.toggle("normal", !phase.expand);
+    }
+    if (instr) instr.textContent = count < 4 ? `Cycle ${Math.floor(count/4)+1} of 3` : "Done! Breathe normally.";
+    count++;
+    if (count < 12) {
+      breathInt = setTimeout(() => { p++; run(); }, phase.dur);
+    } else {
+      if (circle) { circle.textContent = "Done ✅"; circle.classList.remove("expand"); }
+      if (instr) instr.textContent = "Exercise complete. You're calm.";
+    }
+  };
+  clearTimeout(breathInt);
+  run();
+}
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(id)  { document.getElementById(id).classList.remove("hidden"); }
+function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
+function showWhySkip()  { openModal("why-skip-modal"); }
+function openHelpModal(){ openModal("help-modal"); }
+
+// Close on overlay click
+document.querySelectorAll(".overlay").forEach(el => {
+  el.addEventListener("click", function(e) {
+    if (e.target === this) closeModal(this.id);
+  });
+});
+
+// ============================================================
+// SCREEN NAVIGATION
+// ============================================================
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+  document.getElementById("nav-" + name).classList.add("active");
+
+  if (name === "progress") { renderProgress(); renderCharts(); }
+  if (name === "review")   { renderHistory(); recalcScore(); }
+  if (name === "finances") { loadSettings(); calcFreedom(); renderCharts(); }
+}
+
+// ============================================================
+// UTILITY
+// ============================================================
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function setToggle(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.checked = !!val;
+}
+function getToggle(id) {
+  const el = document.getElementById(id);
+  return el ? el.checked : false;
+}
+function setInp(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val !== undefined && val !== null ? val : "";
+}
+function getInp(id) {
+  const el = document.getElementById(id);
+  return el ? el.value : "";
+}
+function setSlider(sliderId, labelId, val) {
+  const s = document.getElementById(sliderId);
+  const l = document.getElementById(labelId);
+  if (s) s.value = val;
+  if (l) l.textContent = val;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
+  setInterval(renderSchedule, 60000);  // refresh schedule every minute
+
+  rotateQuote();
+  setInterval(rotateQuote, 15000);
+
+  loadToday();
+  loadSettings();
+  updateCPAK();
+  renderSchedule();
+  updateWakeDisplay();
+  updateSobriety();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
